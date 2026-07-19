@@ -1,0 +1,116 @@
+#!/usr/bin/env sh
+
+# Configure the R package build.
+#
+# The C++ core is compiled directly into the package shared object via
+# Makevars — no CMake, no network access, no pre-built static archives. This
+# script only has to (1) stage the core sources when building in the monorepo,
+# (2) generate the list of object files to compile, and (3) detect OpenMP
+# support (which needs special handling on macOS).
+
+set -e
+
+# ---------------------------------------------------------------------------
+# 1. Stage core C++ sources.
+#
+# Tarball (CRAN): `src/core` is already bundled by `make r-prepare`.
+# Monorepo (devtools::load_all / install_github with subdir): copy `../../core`
+# into `src/core` so the same relative include paths work in both contexts.
+# ---------------------------------------------------------------------------
+if [ ! -d src/core ]; then
+  if [ -d ../../core ]; then
+    echo "* Monorepo detected: staging core sources into src/core"
+    mkdir -p src/core
+    cp -R ../../core/include src/core/include
+    cp -R ../../core/src src/core/src
+  else
+    echo "ERROR: Cannot find core source. Expected src/core (tarball) or ../../core (monorepo)."
+    exit 1
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# 2. Generate the OBJECTS list.
+#
+# Everything the R bindings need lives under models / stats / serialization /
+# utils / strategies. The CLI, io, golden and test translation units are
+# excluded — they pull in fmt / csv-parser / googletest, none of which the R
+# package requires. Paths are relative to `src/` (where make runs).
+# ---------------------------------------------------------------------------
+OBJECTS="main.o RcppExports.o"
+for src in $(cd src && find core/src -name '*.cpp' \
+    ! -name '*.test.cpp' \
+    ! -name 'test.cpp' \
+    ! -path 'core/src/cli/*' \
+    ! -path 'core/src/io/*' \
+    ! -path 'core/src/golden/*'); do
+  OBJECTS="${OBJECTS} ${src%.cpp}.o"
+done
+
+# ---------------------------------------------------------------------------
+# 3. Detect OpenMP.
+#
+# On Linux/Windows R's $(SHLIB_OPENMP_CXXFLAGS) is enough. macOS clang needs
+# "-Xclang -fopenmp" plus an explicit libomp; probe for it the way data.table
+# does and fall back to a serial build if unavailable.
+# ---------------------------------------------------------------------------
+DARWIN_OPENMP_CXXFLAGS=""
+DARWIN_OPENMP_LIBS=""
+
+if [ "$(uname)" = "Darwin" ]; then
+  TEMP_CXX=$("${R_HOME}/bin/R" CMD config CXX17)
+  TEMP_CXXFLAGS=$("${R_HOME}/bin/R" CMD config CXX17FLAGS)
+
+  cat <<EOF > test-omp.cpp
+#include <omp.h>
+int main() { return omp_get_num_threads(); }
+EOF
+
+  R_OPENMP_ENABLED=0
+
+  printf "%s" "* checking if R supports OpenMP with \"-Xclang -fopenmp\" ... "
+  if CPPFLAGS="${CPPFLAGS} -Xclang -fopenmp" LDFLAGS="${LDFLAGS} -lomp" \
+      "${R_HOME}/bin/R" CMD SHLIB test-omp.cpp >> config.log 2>&1; then
+    echo "yes"
+    DARWIN_OPENMP_CXXFLAGS="-Xclang -fopenmp"
+    DARWIN_OPENMP_LIBS="-lomp"
+    R_OPENMP_ENABLED=1
+  else
+    echo "no"
+    if [ "$(uname -m)" = "arm64" ]; then
+      HOMEBREW_PREFIX=/opt/homebrew
+    else
+      HOMEBREW_PREFIX=/usr/local
+    fi
+    if [ -e "${HOMEBREW_PREFIX}/opt/libomp" ]; then
+      printf "%s" "* checking libomp at ${HOMEBREW_PREFIX}/opt/libomp ... "
+      LIBOMP_INCLUDE="-I${HOMEBREW_PREFIX}/opt/libomp/include -Xclang -fopenmp"
+      LIBOMP_LINK="-L${HOMEBREW_PREFIX}/opt/libomp/lib -lomp"
+      if ${TEMP_CXX} ${TEMP_CXXFLAGS} ${LIBOMP_INCLUDE} ${LIBOMP_LINK} test-omp.cpp -o test-omp.out >> config.log 2>&1; then
+        echo "yes"
+        DARWIN_OPENMP_CXXFLAGS="${LIBOMP_INCLUDE}"
+        DARWIN_OPENMP_LIBS="${LIBOMP_LINK}"
+        R_OPENMP_ENABLED=1
+      else
+        echo "no"
+      fi
+    fi
+  fi
+
+  rm -rf test-omp.* a.out* config.log
+
+  if [ "${R_OPENMP_ENABLED}" = "0" ]; then
+    echo "***"
+    echo "*** OpenMP not available — forest training will run single-threaded."
+    echo "*** Install it with:  brew install libomp"
+    echo "***"
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# 4. Generate src/Makevars from the template.
+# ---------------------------------------------------------------------------
+sed -e "s|@DARWIN_OPENMP_CXXFLAGS@|${DARWIN_OPENMP_CXXFLAGS}|" \
+    -e "s|@DARWIN_OPENMP_LIBS@|${DARWIN_OPENMP_LIBS}|" \
+    -e "s|@OBJECTS@|${OBJECTS}|" \
+    src/Makevars.in > src/Makevars
