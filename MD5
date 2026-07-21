@@ -1,7 +1,7 @@
-52f0003cfdcdaa1490c574ad4741967d *DESCRIPTION
+2fc6bd6f69d6b04b36bd541b1c0da94f *DESCRIPTION
 5f538cd8cd45929433c4a9b9d04450ba *LICENSE
 0f714ccfc893e9111865225971738e9c *NAMESPACE
-258d0e9db26320e31e014dfe30d9c0c1 *NEWS.md
+a298bfa4db178c16a95b5e8e856ec9c7 *NEWS.md
 094649ded03bd3ebff6bff1915f1eb55 *R/RcppExports.R
 55ea059b9168068b1b23522454f4d122 *R/binarize-strategy.R
 796c274f233e8e866aa07921ba3e470a *R/cutpoint-strategy.R
@@ -95,7 +95,7 @@ eadab6919d4e4b7b7bc71b6d49d57dda *inst/include/nlohmann/detail/output/binary_wri
 750462ee5a7b90c40fa0335cca7e6bae *inst/include/nlohmann/detail/string_concat.hpp
 18e63ccf7e6f61d81f23890f5903bcc3 *inst/include/nlohmann/detail/string_escape.hpp
 53dfbd4a1bd0fa66fc2ef295027744c1 *inst/include/nlohmann/detail/value_t.hpp
-e8373e59484390f76544a1f887f8a3d1 *inst/include/nlohmann/json.hpp
+33eba0f199f12d8dd3432b8dd407a6a1 *inst/include/nlohmann/json.hpp
 8d4e225f39a1e8d0f272332eed87b802 *inst/include/nlohmann/json_fwd.hpp
 0ebf0c37c79c6b38e708b6c8cbf2f270 *inst/include/nlohmann/ordered_map.hpp
 e8d84d0c23e04ec479f1d2aeed92d78e *inst/include/nlohmann/thirdparty/hedley/hedley.hpp

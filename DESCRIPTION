@@ -1,8 +1,8 @@
 Package: ppforest2
 Type: Package
 Title: Projection Pursuit Oblique Decision Trees and Random Forests
-Version: 0.1.1
-Date: 2026-07-10
+Version: 0.1.2
+Date: 2026-07-20
 Authors@R: c(
     person("Andrés", "Vidal", email = "andres@andresvidal.dev", role = c("aut", "cre", "cph")),
     person("Natalia", "da Silva", role = "aut"))
@@ -32,9 +32,9 @@ VignetteBuilder: knitr
 Config/testthat/edition: 3
 Config/testthat/parallel: false
 NeedsCompilation: yes
-Packaged: 2026-07-10 20:07:48 UTC; andres
+Packaged: 2026-07-20 19:36:31 UTC; andres
 Author: Andrés Vidal [aut, cre, cph],
   Natalia da Silva [aut]
 Maintainer: Andrés Vidal <andres@andresvidal.dev>
 Repository: CRAN
-Date/Publication: 2026-07-19 13:10:07 UTC
+Date/Publication: 2026-07-21 08:20:02 UTC
