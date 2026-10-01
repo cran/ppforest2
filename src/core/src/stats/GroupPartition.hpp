@@ -45,9 +45,6 @@ namespace ppforest2::stats {
     using GroupVector = types::GroupIdVector;
 
   public:
-    /** @brief Check whether all equal values in @p y form a single contiguous block. */
-    static bool is_contiguous(GroupVector const& y);
-
     /**
        * @brief Construct from a sorted response vector.
        *
@@ -136,7 +133,7 @@ namespace ppforest2::stats {
         }
       }
 
-      return x(indices, Eigen::all);
+      return x(indices, Eigen::indexing::all);
     }
 
     /**
@@ -178,7 +175,7 @@ namespace ppforest2::stats {
         }
       }
 
-      return x(indices, Eigen::all);
+      return x(indices, Eigen::indexing::all);
     }
 
     /** @brief Overall mean of all grouped rows (p). */
