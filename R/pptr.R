@@ -12,8 +12,8 @@ NULL
 #'
 #' @param formula A formula of the form \code{y ~ x1 + x2 + ...}, where \code{y} is a vector of labels and \code{x1}, \code{x2}, ... are the features.
 #' @param data A data frame containing the variables in the formula.
-#' @param x A matrix containing the features for each observation.
-#' @param y A matrix containing the labels for each observation.
+#' @param x A numeric matrix or data frame of features, one row per observation.
+#' @param y The response, one value per row of \code{x}: a factor or character vector of labels for classification, or a numeric vector for regression.
 #' @param mode Training mode: either \code{"classification"} or \code{"regression"}. When \code{NULL} (default), mode is auto-detected from \code{y}'s type — factor or character vectors trigger classification, numeric vectors trigger regression. Setting it explicitly is useful for the binary-integer-labels case (\code{mode = "classification"} with integer 0/1 labels) and for failing fast on a type mismatch (\code{mode = "regression"} with a factor \code{y} errors immediately).
 #' @param lambda A regularization parameter (default: 0.5). If \code{lambda = 0}, the model is trained using Linear Discriminant Analysis (LDA). If \code{lambda > 0}, the model is trained using Penalized Discriminant Analysis (PDA). The default uses PDA because pure LDA (\code{lambda = 0}) is ill-conditioned when there are more variables than effective observations (see the "Known limitations" section of the README). Cannot be used together with \code{pp}.
 #' @param seed An optional integer seed for reproducibility. If \code{NULL} (default), a seed is drawn from R's RNG, so \code{set.seed()} controls reproducibility. If an integer is provided, that value is used directly.
@@ -119,8 +119,7 @@ pptr <- function(
   model$x       <- x
   model$y       <- y
 
-  scale <- apply(x, 2, sd)
-  scale[scale == 0] <- 1
+  scale <- feature_scale(x)
 
   model$vi <- list(
     scale       = scale,
@@ -154,6 +153,7 @@ pptr <- function(
 predict.pptr_classification <- function(object, new_data = NULL, type = NULL, ...) {
   x <- process_predict_arguments(object, new_data, ...)
   if (is.null(type)) type <- "class"
+  check_prediction_type(type)
 
   if (type == "prob") {
     probs <- ppforest2_predict_tree_prob(object, x)
@@ -168,7 +168,7 @@ predict.pptr_classification <- function(object, new_data = NULL, type = NULL, ..
   }
 
   y <- ppforest2_predict_tree(object, x)
-  as.factor(object$groups[y])
+  factor(object$groups[y], levels = object$groups)
 }
 
 #' Predicts numeric responses from a pptr model (regression mode).
@@ -183,6 +183,7 @@ predict.pptr_classification <- function(object, new_data = NULL, type = NULL, ..
 predict.pptr_regression <- function(object, new_data = NULL, type = NULL, ...) {
   x <- process_predict_arguments(object, new_data, ...)
   if (is.null(type)) type <- "response"
+  check_prediction_type(type)
 
   if (type %in% c("class", "prob")) {
     stop("`type = \"", type, "\"` is not available for regression models. ",

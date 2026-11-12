@@ -14,11 +14,7 @@ NULL
 #'
 #' OOB error, OOB predictions, permuted variable importance, and weighted variable importance are computed lazily on first access via the accessor functions (`oob_error()`, `oob_predictions()`, `permuted_importance()`, `weighted_importance()`). Training itself is fast because these OOB-based computations are deferred.
 #'
-#' @param formula A formula of the form \code{y ~ x1 + x2 + ...}, where \code{y} is a vector of labels and \code{x1}, \code{x2}, ... are the features.
-#' @param data A data frame containing the variables in the formula.
-#' @param x A matrix containing the features for each observation.
-#' @param y A matrix containing the labels for each observation.
-#' @param mode Training mode: either \code{"classification"} or \code{"regression"}. When \code{NULL} (default), mode is auto-detected from \code{y}'s type — factor or character vectors trigger classification, numeric vectors trigger regression. Setting it explicitly is useful for the binary-integer-labels case (\code{mode = "classification"} with integer 0/1 labels) and for failing fast on a type mismatch (\code{mode = "regression"} with a factor \code{y} errors immediately).
+#' @inheritParams pptr
 #' @param size The number of trees in the forest (default: 100).
 #' @param lambda A regularization parameter (default: 0.5). If \code{lambda = 0}, the model is trained using Linear Discriminant Analysis (LDA). If \code{lambda > 0}, the model is trained using Penalized Discriminant Analysis (PDA). The default uses PDA because pure LDA (\code{lambda = 0}) is ill-conditioned when there are more variables than effective observations (see the "Known limitations" section of the README). Cannot be used together with \code{pp}.
 #' @param n_vars The number of variables to consider at each split (integer). These are chosen uniformly in each split. By default, half of the variables are used (\code{p_vars = 0.5}). Cannot be used together with \code{p_vars} or \code{dr}.
@@ -187,8 +183,7 @@ pprf <- function(
 
   # Cheap, always-available VI fields. Expensive OOB-based importances
   # (`permuted_importance()`, `weighted_importance()`) compute lazily.
-  scale <- apply(x, 2, sd)
-  scale[scale == 0] <- 1
+  scale <- feature_scale(x)
   model$vi <- list(
     scale       = scale,
     projections = ppforest2_vi_projections_forest(model, ncol(x), scale)
@@ -226,6 +221,7 @@ pprf <- function(
 predict.pprf_classification <- function(object, new_data = NULL, type = NULL, ...) {
   x <- process_predict_arguments(object, new_data, ...)
   if (is.null(type)) type <- "class"
+  check_prediction_type(type)
 
   if (type == "prob") {
     probs <- ppforest2_predict_forest_prob(object, x)
@@ -240,7 +236,7 @@ predict.pprf_classification <- function(object, new_data = NULL, type = NULL, ..
   }
 
   y <- ppforest2_predict_forest(object, x)
-  as.factor(object$groups[y])
+  factor(object$groups[y], levels = object$groups)
 }
 
 #' Predicts numeric responses from a pprf model (regression mode).
@@ -255,6 +251,7 @@ predict.pprf_classification <- function(object, new_data = NULL, type = NULL, ..
 predict.pprf_regression <- function(object, new_data = NULL, type = NULL, ...) {
   x <- process_predict_arguments(object, new_data, ...)
   if (is.null(type)) type <- "response"
+  check_prediction_type(type)
 
   if (type %in% c("class", "prob")) {
     stop("`type = \"", type, "\"` is not available for regression models. ",
@@ -430,7 +427,7 @@ summary.pprf_regression <- function(object, ...) {
   names(tbl)[2] <- "\u03c3"
   print(tbl)
 
-  if (!all(model$vi$scale == 1)) {
+  if (!isTRUE(all.equal(unname(model$vi$scale), rep(1, length(model$vi$scale))))) {
     cat("\nNote: Variable importance was calculated using scaled coefficients (|a_j| * \u03c3_j).\n")
     cat("Variable contributions can only be theoretically interpreted as such\n")
     cat("if the model was trained on scaled data. Scaling also changes the\n")

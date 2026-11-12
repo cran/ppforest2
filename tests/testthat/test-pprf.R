@@ -171,6 +171,21 @@ describe("pprf training spec", {
     expect_equal(model$training_spec$vars$count, 2)  # 0.5 * 4 = 2
   })
 
+  it("gives every tree the forest's training spec", {
+    model <- pprf(Species ~ ., data = iris, size = 5, seed = 0)
+    for (tree in model$trees) {
+      expect_identical(tree$training_spec, model$training_spec)
+    }
+  })
+
+  it("predicts the same after one tree's training spec is changed in R", {
+    model <- pprf(Species ~ ., data = iris, size = 5, seed = 0)
+    changed <- model
+    changed$trees[[1]]$training_spec$seed <- model$training_spec$seed + 1
+    expect_identical(changed$trees[[2]]$training_spec, model$training_spec)
+    expect_identical(predict(changed, iris), predict(model, iris))
+  })
+
   it("generates as many trees as indicated by the size parameter", {
     model <- pprf(Species ~ ., data = iris, size = 3, threads = 1)
     expect_equal(length(model$trees), 3)
@@ -788,5 +803,34 @@ describe("pprf call capture and update()", {
     out <- capture.output(print(model))
     expect_true(any(grepl("^\\s*Call:", out)))
     expect_true(any(grepl("pprf\\(", out)))
+  })
+})
+
+describe("pprf with rows in any order", {
+  # The core trains on rows sorted by the response; a stable sort of `data`
+  # gives `data[grouped, ]`, so both forests are trained on the same matrix.
+  set.seed(0)
+  data <- iris[sample(nrow(iris)), ]
+  grouped <- order(data$Species)
+
+  it("computes OOB results on the same observations as for grouped rows", {
+    shuffled_model <- pprf(Species ~ ., data = data, size = 20, seed = 0)
+    grouped_model <- pprf(Species ~ ., data = data[grouped, ], size = 20, seed = 0)
+
+    expect_identical(oob_predictions(shuffled_model)[grouped], oob_predictions(grouped_model))
+    expect_identical(oob_error(shuffled_model), oob_error(grouped_model))
+    expect_identical(grouped[bag_samples(grouped_model)[[1]]], bag_samples(shuffled_model)[[1]])
+  })
+
+  it("keeps the training data in the order given", {
+    model <- pprf(Species ~ ., data = data, size = 5, seed = 0)
+    expect_identical(rownames(model$x), rownames(data))
+    expect_identical(fitted(model), predict(model, data))
+  })
+
+  it("keeps regression fitted values and residuals in the order given", {
+    model <- suppressWarnings(pprf(mpg ~ ., data = mtcars, size = 5, seed = 0))
+    expect_identical(fitted(model), predict(model, mtcars))
+    expect_equal(residuals(model), mtcars$mpg - predict(model, mtcars))
   })
 })

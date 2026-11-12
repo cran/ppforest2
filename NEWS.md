@@ -1,3 +1,32 @@
+# ppforest2 0.1.4
+
+## Bug fixes
+
+- For forests trained on classification data whose rows are not sorted by the levels of the response (for example, grouped by class but in a different order), `oob_error()`, `oob_predictions()`, `permuted_importance()` and `weighted_importance()` used the wrong out-of-bag observations, because each tree's bootstrap sample referred to the rows after they were sorted for training. The OOB error was too low as a result. The bootstrap samples now refer to the rows in the order given.
+- For regression models, `model$x`, `model$y`, `fitted()` and `residuals()` follow the order of the training rows. They used to be sorted by the response, so `fitted()` did not line up with the data.
+- `predict()` errors when `new_data` has a different number of columns from the training data. It used to return predictions computed from mismatched columns.
+- `predict()` errors when `new_data` contains `NA`, `NaN` or infinite values. A data frame row with a missing value used to be dropped silently, so fewer predictions than rows were returned.
+- `pptr()` and `pprf()` error on missing values in `data` passed through the formula interface, as they already did for the matrix interface. Rows with missing values used to be dropped silently.
+- `pptr()` and `pprf()` error on infinite values in the features.
+- Class predictions from `predict()` keep every group of the model as a factor level, including groups that are not predicted.
+- `stop_min_size()`, `stop_min_variance()` and `stop_max_depth()` error with a clear message when their argument is not a single value of the right type, instead of R's "the condition has length > 1" or silently truncating a non-integer.
+
+## Improvements
+
+- `predict()` accepts a data frame without the response column for models trained through the formula interface.
+- `pptr()` and `pprf()` reject empty data and list columns with explicit messages.
+- `save_json()` appends `.json` to a path without that suffix, and returns the path it wrote.
+- Constant features are detected with a tolerance relative to the feature's magnitude when scaling variable importance, and `summary()` detects standardized data with a tolerance.
+- A forest's training specification is converted between C++ and R once per forest instead of once per tree, which makes `pprf()`, `predict()` and the other functions that pass a forest to C++ faster for forests of many small trees.
+
+## Documentation
+
+- `citation("ppforest2")` cites the package and the two papers describing the method, and `?ppforest2` documents the package.
+
+## Packaging and build
+
+- `DESCRIPTION` lists the authors of the bundled nlohmann/json and PCG code as copyright holders, and `inst/COPYRIGHTS` gives their copyright and license.
+
 # ppforest2 0.1.3
 
 ## New features
